@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Module | StayEasy</title>
+    <link rel="stylesheet" href="style.css?v=20261106-verified-galleries" />
+  </head>
+
+  <body>
+    <nav class="dashboard-nav">
+      <a class="brand" href="user.html">Stay<span>Easy</span></a>
+
+      <div>
+        <span id="welcome" class="welcome"></span>
+        <button class="logout" onclick="logout()">Logout</button>
+      </div>
+    </nav>
+
+    <main class="dashboard">
+      <section class="dash-head">
+        <div>
+          <p class="eyebrow blue">USER MODULE</p>
+          <h1>Find your next stay</h1>
+          <p class="muted">Browse 8 real properties. Use the photo arrows to explore each gallery; compare different hotels only within the same city.</p>
+        </div>
+
+        <div class="stat">
+          <b id="bookingCount">0</b>
+          <small>My Bookings</small>
+        </div>
+      </section>
+
+      <section class="search">
+        <label>
+          Location
+          <select id="location">
+            <option value="">All Locations</option>
+            <option>Vijayawada</option>
+            <option>Hyderabad</option>
+            <option>Visakhapatnam</option>
+            <option>Bengaluru</option>
+            <option>Goa</option>
+            <option>Chennai</option>
+            <option>Mysuru</option>
+          </select>
+        </label>
+
+        <label>
+          Amenity
+          <select id="amenity">
+            <option value="">All Amenities</option>
+            <option>WiFi</option>
+            <option>Pool</option>
+            <option>Gym</option>
+            <option>Breakfast</option>
+            <option>Parking</option>
+            <option>Spa</option>
+            <option>Beach access</option>
+          </select>
+        </label>
+
+        <label>
+          Sort
+          <select id="sort">
+            <option value="recommended">Recommended</option>
+            <option value="low">Price: Low to High</option>
+            <option value="high">Price: High to Low</option>
+          </select>
+        </label>
+
+        <button class="primary-btn" onclick="searchHotels()">Search</button>
+        <button class="secondary-btn" onclick="clearSearch()">Clear</button>
+      </section>
+
+      <div class="section-head">
+        <h2>Popular Hotels</h2>
+        <span id="resultCount"></span>
+      </div>
+
+      <section id="hotels" class="hotel-grid"></section>
+
+      <section id="compareTray" class="compare-tray" aria-label="Hotel comparison" hidden>
+        <div>
+          <b>Stay comparison</b>
+          <span id="compareCount">0 selected</span>
+          <small>Select 2 or 3 different hotels in the same city.</small>
+        </div>
+        <div class="compare-tray-actions">
+          <button id="compareOpen" class="primary-btn" type="button" onclick="openHotelComparison()" disabled>Compare stays</button>
+          <button class="secondary-btn" type="button" onclick="clearHotelComparison()">Clear</button>
+        </div>
+      </section>
+
+      <div class="section-head">
+        <h2>My Bookings</h2>
+      </div>
+
+      <section id="myBookings" class="bookings"></section>
+    </main>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Hotel booking and comparison">
+      <div class="modal-card">
+        <button class="close" type="button" aria-label="Close dialog" onclick="closeModal()">×</button>
+        <div id="modalContent"></div>
+      </div>
+    </div>
+
+    <script src="script.js?v=20261106-verified-galleries"></script>
+  </body>
+</html>
