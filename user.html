@@ -4,50 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User Module | StayEasy</title>
-    <link rel="stylesheet" href="style.css?v=20261106-verified-galleries" />
+    <link rel="stylesheet" href="style.css?v=20261125-luxe-v6" />
   </head>
 
-  <body>
+  <body class="dashboard-page user-dashboard">
     <nav class="dashboard-nav">
-      <a class="brand" href="user.html">Stay<span>Easy</span></a>
-
-      <div>
-        <span id="welcome" class="welcome"></span>
-        <button class="logout" onclick="logout()">Logout</button>
+      <div class="dashboard-nav-inner">
+        <a class="brand" href="user.html">Stay<span>Easy</span></a>
+        <div class="dashboard-nav-actions">
+          <span class="welcome-chip"><span class="welcome-dot"></span><span id="welcome" class="welcome"></span></span>
+          <button class="logout" type="button" onclick="logout()">Log out <span aria-hidden="true">↗</span></button>
+        </div>
       </div>
     </nav>
 
     <main class="dashboard">
       <section class="dash-head">
         <div>
-          <p class="eyebrow blue">USER MODULE</p>
-          <h1>Find your next stay</h1>
-          <p class="muted">Browse 8 real properties. Use the photo arrows to explore each gallery; compare different hotels only within the same city.</p>
+          <p class="eyebrow">YOUR NEXT CHAPTER</p>
+          <h1>Somewhere good<br />is waiting.</h1>
+          <p>Find a stay that fits the feeling you're chasing. Compare, save and plan it your way.</p>
         </div>
 
         <div class="stat">
+          <span class="stat-spark" aria-hidden="true">✳</span>
           <b id="bookingCount">0</b>
-          <small>My Bookings</small>
+          <small>My trips</small>
         </div>
       </section>
 
-      <section class="search">
-        <label>
-          Location
-          <select id="location">
-            <option value="">All Locations</option>
-            <option>Vijayawada</option>
-            <option>Hyderabad</option>
-            <option>Visakhapatnam</option>
-            <option>Bengaluru</option>
-            <option>Goa</option>
-            <option>Chennai</option>
-            <option>Mysuru</option>
-          </select>
+      <section class="search" aria-label="Find and filter hotels">
+        <label class="filter-field">
+          <span>Destination</span>
+          <input id="location" type="search" placeholder="City or hotel name" autocomplete="off" />
         </label>
 
-        <label>
-          Amenity
+        <label class="filter-field">
+          <span>Must-have</span>
           <select id="amenity">
             <option value="">All Amenities</option>
             <option>WiFi</option>
@@ -60,8 +53,20 @@
           </select>
         </label>
 
-        <label>
-          Sort
+        <label class="filter-field">
+          <span>Vibe Match</span>
+          <select id="vibe">
+            <option value="">All vibes</option>
+            <option>Romantic</option>
+            <option>Heritage</option>
+            <option>Beach</option>
+            <option>Business</option>
+            <option>Family</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span>Sort by</span>
           <select id="sort">
             <option value="recommended">Recommended</option>
             <option value="low">Price: Low to High</option>
@@ -69,22 +74,53 @@
           </select>
         </label>
 
-        <button class="primary-btn" onclick="searchHotels()">Search</button>
-        <button class="secondary-btn" onclick="clearSearch()">Clear</button>
+        <label class="filter-field">
+          <span>Check-in</span>
+          <input id="searchCheckin" type="date" />
+        </label>
+
+        <label class="filter-field">
+          <span>Check-out</span>
+          <input id="searchCheckout" type="date" />
+        </label>
+
+        <label class="filter-field">
+          <span>Guests</span>
+          <select id="searchGuests">
+            <option>1</option>
+            <option selected>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+          </select>
+        </label>
+
+        <div class="search-actions">
+          <button class="primary-btn" type="button" onclick="searchHotels()">Find stays <span aria-hidden="true">→</span></button>
+          <button class="secondary-btn" type="button" onclick="clearSearch()">Reset</button>
+        </div>
       </section>
 
       <div class="section-head">
-        <h2>Popular Hotels</h2>
-        <span id="resultCount"></span>
+        <div>
+          <p class="section-kicker">A STAY FOR EVERY KIND OF YOU</p>
+          <h2>Explore the collection</h2>
+        </div>
+        <div class="hotel-results-tools">
+          <button id="favoritesFilter" class="saved-filter" type="button" aria-pressed="false" onclick="toggleFavoritesFilter()">♡ Saved stays (0)</button>
+          <span id="resultCount"></span>
+        </div>
       </div>
+      <p class="price-pulse-status"><span class="pulse-dot" aria-hidden="true"></span><span id="livePriceStatus">Demo price pulse is active</span></p>
 
-      <section id="hotels" class="hotel-grid"></section>
+      <section id="hotels" class="hotel-grid" aria-live="polite"></section>
 
       <section id="compareTray" class="compare-tray" aria-label="Hotel comparison" hidden>
         <div>
-          <b>Stay comparison</b>
+          <b>Compare your shortlist</b>
           <span id="compareCount">0 selected</span>
-          <small>Select 2 or 3 different hotels in the same city.</small>
+          <small>Compare up to three stays in one city.</small>
         </div>
         <div class="compare-tray-actions">
           <button id="compareOpen" class="primary-btn" type="button" onclick="openHotelComparison()" disabled>Compare stays</button>
@@ -93,19 +129,27 @@
       </section>
 
       <div class="section-head">
-        <h2>My Bookings</h2>
+        <div>
+          <p class="section-kicker">YOUR ITINERARY</p>
+          <h2>Trips you've planned</h2>
+        </div>
+      </div>
+      <div class="trip-filter-tabs" role="group" aria-label="Filter trips">
+        <button class="trip-filter selected" type="button" data-trip-filter="upcoming" aria-pressed="true" onclick="setTripFilter('upcoming')">Upcoming</button>
+        <button class="trip-filter" type="button" data-trip-filter="completed" aria-pressed="false" onclick="setTripFilter('completed')">Completed</button>
+        <button class="trip-filter" type="button" data-trip-filter="cancelled" aria-pressed="false" onclick="setTripFilter('cancelled')">Cancelled</button>
       </div>
 
       <section id="myBookings" class="bookings"></section>
     </main>
 
-    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Hotel booking and comparison">
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Stay booking and comparison">
       <div class="modal-card">
         <button class="close" type="button" aria-label="Close dialog" onclick="closeModal()">×</button>
         <div id="modalContent"></div>
       </div>
     </div>
 
-    <script src="script.js?v=20261106-verified-galleries"></script>
+    <script src="script.js?v=20261125-luxe-v7"></script>
   </body>
 </html>

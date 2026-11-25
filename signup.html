@@ -3,49 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signup | StayEasy</title>
-    <link rel="stylesheet" href="style.css?v=20261106-verified-galleries" />
+    <meta name="theme-color" content="#f5f6f1" />
+    <title>Create your account | StayEasy</title>
+    <link rel="stylesheet" href="style.css?v=20261125-luxe-v6" />
   </head>
 
-  <body class="auth">
-    <div class="auth-card">
-      <a class="brand dark" href="index.html">Stay<span>Easy</span></a>
+  <body class="auth auth-page">
+    <main class="auth-shell auth-shell-signup">
+      <section class="auth-story" aria-label="About StayEasy">
+        <img src="images/stayeasy-hero.svg" alt="" />
+        <a class="auth-story-brand" href="index.html">Stay<span>Easy</span></a>
+        <div class="auth-story-copy">
+          <p>MAKE ROOM FOR SOMETHING GOOD</p>
+          <h2>A little closer<br />to <em>somewhere new.</em></h2>
+          <span>Save the stays you love. Plan the trip you can't stop thinking about.</span>
+        </div>
+        <div class="auth-story-stats">
+          <div><b>08</b><span>curated stays</span></div>
+          <div><b>04</b><span>destinations</span></div>
+          <div><b>01</b><span>easy getaway</span></div>
+        </div>
+      </section>
 
-      <p class="eyebrow blue">NEW USER</p>
-      <h1>Create Account</h1>
-      <p class="muted">Account details are stored in Local Storage for this demo.</p>
+      <section class="auth-panel">
+        <div class="auth-panel-nav">
+          <a class="brand dark" href="index.html">Stay<span>Easy</span></a>
+          <a class="auth-back-link" href="index.html">Back to home <span aria-hidden="true">↗</span></a>
+        </div>
 
-      <form id="signupForm">
-        <label>
-          Full Name
-          <input id="signupName" required placeholder="Full name" />
-        </label>
+        <div class="auth-form-content">
+          <p class="eyebrow auth-eyebrow">YOUR NEXT CHAPTER</p>
+          <h1>Make it a getaway<span>.</span></h1>
+          <p class="auth-intro">Create an account to save stays and keep your plans together.</p>
 
-        <label>
-          Email
-          <input id="signupEmail" type="email" required placeholder="Email" />
-        </label>
+          <form id="signupForm">
+            <label class="auth-field">
+              <span>Full name</span>
+              <input id="signupName" autocomplete="name" required placeholder="How should we call you?" />
+            </label>
 
-        <label>
-          Password
-          <input id="signupPassword" type="password" minlength="6" required placeholder="Minimum 6 characters" />
-        </label>
+            <label class="auth-field">
+              <span>Email address</span>
+              <input id="signupEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
+            </label>
 
-        <label>
-          Confirm Password
-          <input id="signupConfirm" type="password" minlength="6" required placeholder="Re-enter password" />
-        </label>
+            <label class="auth-field">
+              <span>Password</span>
+              <input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters" />
+            </label>
 
-        <button class="primary-btn full" type="submit">Create Account</button>
-      </form>
+            <label class="auth-field">
+              <span>Confirm password</span>
+              <input id="signupConfirm" type="password" autocomplete="new-password" minlength="6" required placeholder="Type it once more" />
+            </label>
 
-      <p id="signupMessage" class="message"></p>
+            <button class="primary-btn full auth-submit" type="submit">Create account <span aria-hidden="true">→</span></button>
+          </form>
 
-      <p class="auth-footer">
-        Already registered? <a href="login.html">Login</a>
-      </p>
-    </div>
+          <p id="signupMessage" class="message auth-message" role="status" aria-live="polite"></p>
 
-    <script src="script.js?v=20261106-verified-galleries"></script>
+          <p class="auth-footer">Already have an account? <a href="login.html">Sign in <span aria-hidden="true">↗</span></a></p>
+          <p class="auth-footnote">Demo project · Account details are stored in this browser.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js?v=20261125-luxe-v7"></script>
   </body>
 </html>

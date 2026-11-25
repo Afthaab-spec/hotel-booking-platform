@@ -3,80 +3,123 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StayEasy | Hotel Booking</title>
-    <link rel="stylesheet" href="style.css?v=20261106-verified-galleries" />
+    <meta name="theme-color" content="#203b31" />
+    <meta name="description" content="Discover stays across India, compare hotels and plan your next trip with StayEasy." />
+    <title>StayEasy | Find your kind of stay</title>
+    <link rel="preload" href="images/stayeasy-hero.svg" as="image" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css?v=20261125-luxe-v6" />
   </head>
 
-  <body class="landing-page">
-    <header class="hero">
-      <nav>
+  <body class="home-page">
+    <header class="home-hero">
+      <img class="home-hero-photo" src="images/stayeasy-hero.svg" alt="" fetchpriority="high" />
+      <nav class="site-nav" aria-label="Main navigation">
         <a class="brand" href="index.html">Stay<span>Easy</span></a>
-
-        <div>
-          <a class="nav-link" href="login.html">Login</a>
-          <a class="nav-btn" href="signup.html">Create Account</a>
+        <div class="site-nav-links">
+          <a href="#discover">Discover</a>
+          <a href="#how-it-works">How it works</a>
+          <a class="site-login" href="login.html">Login</a>
+          <a class="site-signup" href="signup.html">Create account</a>
         </div>
       </nav>
 
-      <div class="hero-content">
-        <p class="eyebrow">HOTEL BOOKING PLATFORM</p>
-        <h1>Find a stay you'll love.</h1>
-        <p>
-          Explore eight real Indian hotel properties, compare what matters and plan your stay.
-        </p>
-        <a class="primary-btn" href="login.html">Start Booking</a>
+      <div class="home-copy">
+        <p class="home-eyebrow">YOUR NEXT GOOD STORY STARTS HERE</p>
+        <h1>Find a stay that feels like <em>you.</em></h1>
+        <p class="home-intro">Compare handpicked Indian stays, save your favourites and plan the little details before you go.</p>
       </div>
     </header>
 
-    <main class="landing">
-      <section class="features">
-        <article>
-          <b>🔎</b>
-          <h3>Find Your Stay</h3>
-          <p>Discover stays that match your destination and must-have comforts.</p>
-        </article>
+    <main>
+      <div class="home-search-wrap">
+        <form id="landingSearchForm" class="home-search" onsubmit="startLandingSearch(event)">
+          <label class="home-search-field" for="landingDestination">
+            <span>DESTINATION</span>
+            <input id="landingDestination" name="destination" type="search" placeholder="City or hotel name" autocomplete="off" />
+          </label>
+          <label class="home-search-field" for="landingCheckin">
+            <span>CHECK IN</span>
+            <input id="landingCheckin" name="checkin" type="date" required />
+          </label>
+          <label class="home-search-field" for="landingCheckout">
+            <span>CHECK OUT</span>
+            <input id="landingCheckout" name="checkout" type="date" required />
+          </label>
+          <label class="home-search-field" for="landingGuests">
+            <span>GUESTS</span>
+            <select id="landingGuests" name="guests">
+              <option>1</option>
+              <option selected>2</option>
+              <option>3</option>
+              <option>4</option>
+              <option>5</option>
+              <option>6</option>
+            </select>
+          </label>
+          <button class="home-search-button" type="submit">Find my stay <span aria-hidden="true">→</span></button>
+        </form>
+      </div>
 
-        <article>
-          <b>🏨</b>
-          <h3>Compare Stays Side by Side</h3>
-          <p>Compare up to three properties by style, sample rate, rooms and amenities before choosing.</p>
-        </article>
-
-        <article>
-          <b>🧳</b>
-          <h3>Book with Ease</h3>
-          <p>Choose your dates and reserve a room in a few simple steps.</p>
-        </article>
-      </section>
-
-      <section class="featured-stays">
-        <div class="featured-stays-heading">
+      <section class="home-content" id="discover">
+        <div class="home-section-head">
           <div>
-            <p class="eyebrow blue">REAL PROPERTIES</p>
+            <p class="home-kicker">A LITTLE INSPIRATION</p>
+            <h2>Where are you headed?</h2>
+          </div>
+          <p class="home-section-note">Pick a travel mood and we'll set up your search.</p>
+        </div>
+        <div class="mood-grid" aria-label="Choose a travel mood">
+          <button class="mood-card" type="button" data-destination="Goa" onclick="chooseTravelMood(this, 'Goa', 'Coastal reset')">
+            <span class="mood-icon" aria-hidden="true">☀</span>
+            <span><b>Coastal reset</b><small>Sea air & slow mornings</small></span>
+            <span class="mood-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="mood-card" type="button" data-destination="Hyderabad" onclick="chooseTravelMood(this, 'Hyderabad', 'City energy')">
+            <span class="mood-icon" aria-hidden="true">⌂</span>
+            <span><b>City energy</b><small>Food, culture & a little buzz</small></span>
+            <span class="mood-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="mood-card" type="button" data-destination="Chennai" onclick="chooseTravelMood(this, 'Chennai', 'Heritage escape')">
+            <span class="mood-icon" aria-hidden="true">✳</span>
+            <span><b>Heritage escape</b><small>Grand stays with a story</small></span>
+            <span class="mood-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="mood-card" type="button" data-destination="Bengaluru" onclick="chooseTravelMood(this, 'Bengaluru', 'Green hideaway')">
+            <span class="mood-icon" aria-hidden="true">❋</span>
+            <span><b>Green hideaway</b><small>Garden calm in the city</small></span>
+            <span class="mood-arrow" aria-hidden="true">↗</span>
+          </button>
+        </div>
+        <p id="moodStatus" class="mood-status" aria-live="polite"></p>
+
+        <div class="home-section-head featured-heading">
+          <div>
+            <p class="home-kicker">HANDPICKED FOR YOUR NEXT TRIP</p>
             <h2>Stays worth knowing</h2>
           </div>
-          <p>Photos of each featured hotel. Sample rates and room counts in the booking demo are illustrative.</p>
+          <a class="home-text-link" href="login.html">Explore all stays <span>→</span></a>
         </div>
+        <div id="featuredHotels" class="hotel-grid featured-hotel-grid" aria-live="polite"></div>
 
-        <div id="featuredHotels" class="hotel-grid featured-hotel-grid"></div>
-      </section>
-
-      <section class="card center">
-        <p class="eyebrow blue">SDC PROJECT</p>
-        <h2>StayEasy Hotel Booking Platform</h2>
-        <p>A hotel booking app built with HTML, CSS, JavaScript, and React, with Admin and User modules.</p>
-
-        <div class="actions">
-          <a class="primary-btn" href="login.html">Login</a>
-          <a class="secondary-btn" href="signup.html">Signup</a>
-        </div>
+        <section class="how-it-works" id="how-it-works">
+          <div>
+            <p class="home-kicker">THE STAYEASY WAY</p>
+            <h2>Less tab-hopping.<br />More trip dreaming.</h2>
+          </div>
+          <div class="how-step"><span>01</span><div><b>Discover</b><p>Find a stay that fits your destination and travel mood.</p></div></div>
+          <div class="how-step"><span>02</span><div><b>Compare</b><p>Check rates, room availability and amenities side by side.</p></div></div>
+          <div class="how-step"><span>03</span><div><b>Plan</b><p>Save stays, choose dates and see an estimated trip total.</p></div></div>
+        </section>
       </section>
     </main>
 
-    <footer>© 2026 StayEasy • SDC Project</footer>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="script.js?v=20261106-react-featured-stays"></script>
-    <script src="featured-hotels.js?v=20261106-react-featured-stays"></script>
+    <footer class="home-footer">
+      <a class="brand" href="index.html">Stay<span>Easy</span></a>
+      <p>Made for better getaways. Sample listings and prices are for demo purposes.</p>
+      <a href="login.html">Start exploring <span>→</span></a>
+    </footer>
+
+    <script src="script.js?v=20261125-luxe-v7"></script>
+    <script src="featured-hotels.js?v=20261125-luxe-v4"></script>
   </body>
 </html>

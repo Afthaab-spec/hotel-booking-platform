@@ -20,6 +20,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury city hotel',
     price: 14500,
     rooms: 5,
+    vibes: ['Romantic', 'Heritage', 'Business'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Breakfast'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Taj_Krishna_hotel_in_hyderabad.jpg/1280px-Taj_Krishna_hotel_in_hyderabad.jpg',
@@ -35,6 +36,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury palace hotel',
     price: 18000,
     rooms: 4,
+    vibes: ['Heritage', 'Business', 'Family'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Spa'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/ITC-Grand-Chola-Chennai-2.JPG/1280px-ITC-Grand-Chola-Chennai-2.JPG',
@@ -50,6 +52,7 @@ const DEFAULT_HOTELS = [
     type: 'Beach resort',
     price: 19000,
     rooms: 3,
+    vibes: ['Romantic', 'Beach', 'Family'],
     amenities: ['WiFi', 'Pool', 'Spa', 'Beach access'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Taj_Fort_Aguada_Resort.jpg/1280px-Taj_Fort_Aguada_Resort.jpg',
@@ -65,6 +68,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury palace hotel',
     price: 26000,
     rooms: 3,
+    vibes: ['Romantic', 'Heritage', 'Business', 'Family'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Spa'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Hotel_Leela_Palace_%284353404470%29.jpg/1280px-Hotel_Leela_Palace_%284353404470%29.jpg',
@@ -79,6 +83,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury city hotel',
     price: 12500,
     rooms: 4,
+    vibes: ['Business', 'Family'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Breakfast'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/2/2c/Hotel_Hyatt_Hyderabad%2C_at_Gachibowli_in_2023_01.jpg',
@@ -94,6 +99,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury city hotel',
     price: 16000,
     rooms: 4,
+    vibes: ['Heritage', 'Business'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Spa'],
     images: [
       'https://cdn.sanity.io/images/ocl5w36p/ihcl_prod/eb07c710ac4635e1f43fa583e85727aaf357a9ec-3840x1860.jpg?w=1024&auto=format&dpr=2',
@@ -109,6 +115,7 @@ const DEFAULT_HOTELS = [
     type: 'Beach resort',
     price: 23000,
     rooms: 3,
+    vibes: ['Romantic', 'Beach', 'Family'],
     amenities: ['WiFi', 'Pool', 'Spa', 'Beach access'],
     images: [
       'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Fountain_at_Taj_Exotica_Goa%2C_2010.JPG/1280px-Fountain_at_Taj_Exotica_Goa%2C_2010.JPG',
@@ -123,6 +130,7 @@ const DEFAULT_HOTELS = [
     type: 'Luxury garden hotel',
     price: 22000,
     rooms: 4,
+    vibes: ['Romantic', 'Heritage', 'Business', 'Family'],
     amenities: ['WiFi', 'Pool', 'Gym', 'Spa'],
     images: [
       'https://www.oberoihotels.com/-/media/oberoi-hotel/the-oberoi-bengaluru/gallery/01-exterior-and-interior/820x646/banner-1.jpg',
@@ -156,10 +164,19 @@ const BUILT_IN_HOTEL_NAMES = new Set([
   ...LEGACY_DEMO_HOTEL_NAMES,
   ...DEFAULT_HOTELS.map((hotel) => hotel.name)
 ]);
-const HOTEL_INVENTORY_VERSION = 5;
+const HOTEL_INVENTORY_VERSION = 6;
 
 let comparedHotelIds = [];
 const MAX_COMPARE_HOTELS = 3;
+let showFavoritesOnly = false;
+let selectedTripFilter = 'upcoming';
+let activeBooking = null;
+let bookingHoldTimer = null;
+const ROOM_CATEGORIES = { Deluxe: 1, Suite: 1.7, 'Royal Suite': 2.6 };
+const PRICE_TAX_RATE = 0.12;
+const PRICE_LOCK_FEE = 299;
+const PRICE_HOLD_SECONDS = 10 * 60;
+const hotelPulse = new Map();
 
 function hotelPhotos(hotel) {
   return Array.isArray(hotel.images) && hotel.images.length
@@ -172,7 +189,7 @@ function renderHotelGallery(hotel) {
 
   return `
     <div class="hotel-gallery" data-photo-index="0">
-      <img class="hotel-image" src="${photos[0]}" alt="${hotel.name} photo 1 of ${photos.length}" />
+      <img class="hotel-image" src="${photos[0]}" alt="${hotel.name} photo 1 of ${photos.length}" loading="lazy" decoding="async" />
       ${photos.length > 1 ? `
         <button class="gallery-arrow gallery-previous" type="button" aria-label="Previous ${hotel.name} photo" onclick="changeHotelPhoto(${hotel.id}, -1)">‹</button>
         <button class="gallery-arrow gallery-next" type="button" aria-label="Next ${hotel.name} photo" onclick="changeHotelPhoto(${hotel.id}, 1)">›</button>
@@ -214,8 +231,9 @@ function readStorage(key, fallback) {
 function writeStorage(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch (error) {
-    // ignore storage errors
+    return false;
   }
 }
 
@@ -223,6 +241,65 @@ const users = () => readStorage('stayeasy_users', []);
 const hotels = () => readStorage('stayeasy_hotels', DEFAULT_HOTELS) || DEFAULT_HOTELS;
 const bookings = () => readStorage('stayeasy_bookings', []);
 const save = (key, value) => writeStorage(key, value);
+const formatINR = (amount) => Number(amount).toLocaleString('en-IN');
+
+function hotelVibes(hotel) {
+  if (Array.isArray(hotel.vibes) && hotel.vibes.length) return hotel.vibes;
+
+  const searchText = `${hotel.name} ${hotel.location} ${hotel.type || ''} ${(hotel.amenities || []).join(' ')}`.toLowerCase();
+  const vibes = [];
+  if (/beach|goa|coast|sea/.test(searchText)) vibes.push('Beach');
+  if (/palace|heritage|taj|fort|chola/.test(searchText)) vibes.push('Heritage');
+  if (/resort|spa|pool|garden/.test(searchText)) vibes.push('Romantic');
+  if (/business|city|wifi|gym|hyderabad|chennai|bengaluru/.test(searchText)) vibes.push('Business');
+  if (/pool|breakfast|family|resort/.test(searchText)) vibes.push('Family');
+  return [...new Set(vibes)];
+}
+
+function liveHotelPrice(hotel) {
+  return hotelPulse.get(hotel.id)?.price ?? hotel.price;
+}
+
+function liveRoomsRemaining(hotel) {
+  const actualRooms = Math.max(0, Number(hotel.rooms) || 0);
+  const simulatedRooms = hotelPulse.get(hotel.id)?.rooms;
+  return simulatedRooms === undefined ? actualRooms : Math.min(actualRooms, simulatedRooms);
+}
+
+function updateHotelPricePulse() {
+  const hotelList = hotels();
+  hotelList.forEach((hotel) => {
+    const state = hotelPulse.get(hotel.id) || {
+      price: hotel.price,
+      visitors: 3 + Math.floor(Math.random() * 12),
+      rooms: hotel.rooms,
+      trend: 0
+    };
+    const previousPrice = state.price;
+    const nextPrice = Math.max(
+      hotel.price * 0.85,
+      Math.min(hotel.price * 1.25, previousPrice * (1 + (Math.random() - 0.5) * 0.03))
+    );
+    state.price = Math.round(nextPrice);
+    state.trend = state.price === previousPrice ? 0 : state.price > previousPrice ? 1 : -1;
+    state.visitors = Math.max(1, Math.min(25, state.visitors + Math.round((Math.random() - 0.5) * 4)));
+    if (hotel.rooms > 0 && Math.random() < 0.3) {
+      state.rooms = Math.max(1, Math.min(hotel.rooms, state.rooms - (Math.random() < 0.6 ? 1 : -1)));
+    } else {
+      state.rooms = Math.min(hotel.rooms, Math.max(1, state.rooms));
+    }
+    hotelPulse.set(hotel.id, state);
+  });
+
+  const liveLabel = document.getElementById('livePriceStatus');
+  if (liveLabel) {
+    liveLabel.textContent = `Demo prices updated ${new Date().toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  }
+  searchHotels();
+}
 
 (function seedDefaultData() {
   const allUsers = users();
@@ -256,6 +333,13 @@ const save = (key, value) => writeStorage(key, value);
 })();
 
 const me = () => readStorage('stayeasy_currentUser', null);
+const favoriteStorageKey = (user) => `stayeasy_favorites_${user.email}`;
+const savedHotelIds = () => {
+  const currentUser = me();
+  if (!currentUser) return [];
+  const saved = readStorage(favoriteStorageKey(currentUser), []);
+  return Array.isArray(saved) ? saved : [];
+};
 
 function logout() {
   try {
@@ -295,10 +379,20 @@ function getLandingSearch() {
 function startLandingSearch(event, hotelId = null, selectedDestination = null) {
   if (event) event.preventDefault();
 
+  const checkin = document.getElementById('landingCheckin').value;
+  const checkout = document.getElementById('landingCheckout').value;
+  if (checkin && checkout && checkout <= checkin) {
+    document.getElementById('landingCheckout').setCustomValidity('Check-out must be after check-in.');
+    document.getElementById('landingCheckout').reportValidity();
+    return;
+  }
+  document.getElementById('landingCheckout').setCustomValidity('');
+
   const search = {
     destination: selectedDestination ?? document.getElementById('landingDestination').value,
-    checkin: document.getElementById('landingCheckin').value,
-    checkout: document.getElementById('landingCheckout').value,
+    checkin,
+    checkout,
+    guests: Number(document.getElementById('landingGuests').value || 2),
     hotelId
   };
 
@@ -317,6 +411,17 @@ function startFeaturedBooking(hotelId) {
   startLandingSearch(null, hotelId, hotel?.location || '');
 }
 
+function chooseTravelMood(button, destination, mood) {
+  document.getElementById('landingDestination').value = destination;
+  document.querySelectorAll('.mood-card').forEach((card) => {
+    const selected = card === button;
+    card.classList.toggle('selected', selected);
+    card.setAttribute('aria-pressed', String(selected));
+  });
+  document.getElementById('moodStatus').textContent = `${mood} selected — your search is set to ${destination}.`;
+  document.getElementById('landingCheckin').focus({ preventScroll: true });
+}
+
 const signupForm = document.getElementById('signupForm');
 
 if (signupForm) {
@@ -325,12 +430,15 @@ if (signupForm) {
 
     const allUsers = users();
     const email = signupEmail.value.trim().toLowerCase();
+    signupMessage.classList.remove('is-success');
 
     if (signupPassword.value !== signupConfirm.value) {
+      signupMessage.classList.add('is-error');
       return (signupMessage.textContent = 'Passwords do not match.');
     }
 
     if (allUsers.some((user) => user.email === email)) {
+      signupMessage.classList.add('is-error');
       return (signupMessage.textContent = 'Email already registered.');
     }
 
@@ -342,6 +450,8 @@ if (signupForm) {
     });
 
     save('stayeasy_users', allUsers);
+    signupMessage.classList.remove('is-error');
+    signupMessage.classList.add('is-success');
     signupMessage.style.color = '#15803d';
     signupMessage.textContent = 'Signup successful! Redirecting...';
 
@@ -364,9 +474,12 @@ if (loginForm) {
     );
 
     if (!user) {
+      loginMessage.classList.add('is-error');
       return (loginMessage.textContent = 'Invalid email or password.');
     }
 
+    loginMessage.classList.remove('is-error');
+    loginMessage.classList.add('is-success');
     save('stayeasy_currentUser', user);
     location.href = user.role === 'admin' ? 'admin.html' : 'user.html';
   };
@@ -377,7 +490,14 @@ function renderHotels(list) {
 
   if (!hotelBox) return;
 
-  resultCount.textContent = `${list.length} hotels found`;
+  const favorites = savedHotelIds();
+  resultCount.textContent = `${list.length} ${list.length === 1 ? 'hotel' : 'hotels'} found`;
+  const favoritesFilter = document.getElementById('favoritesFilter');
+  if (favoritesFilter) {
+    favoritesFilter.textContent = `♡ Saved stays (${favorites.length})`;
+    favoritesFilter.setAttribute('aria-pressed', String(showFavoritesOnly));
+    favoritesFilter.classList.toggle('selected', showFavoritesOnly);
+  }
 
   hotelBox.innerHTML = list.length
     ? list
@@ -393,6 +513,13 @@ function renderHotels(list) {
                     <p class="location">📍 ${hotel.location}</p>
                   </div>
                   <span class="hotel-type">${hotel.type || 'Hotel'}</span>
+                  <button
+                    class="favorite-toggle ${favorites.includes(hotel.id) ? 'selected' : ''}"
+                    type="button"
+                    aria-label="${favorites.includes(hotel.id) ? 'Remove' : 'Save'} ${hotel.name} ${favorites.includes(hotel.id) ? 'from' : 'to'} saved stays"
+                    aria-pressed="${favorites.includes(hotel.id)}"
+                    onclick="toggleHotelFavorite(${hotel.id})"
+                  >${favorites.includes(hotel.id) ? '♥ Saved' : '♡ Save'}</button>
                 </div>
 
                 <div class="amenities">
@@ -401,11 +528,22 @@ function renderHotels(list) {
                     .join('')}
                 </div>
 
+                <div class="hotel-vibes">
+                  ${hotelVibes(hotel).map((vibe) => `<span class="vibe-chip">${vibe}</span>`).join('')}
+                </div>
+
+                <div class="hotel-pulse" aria-live="polite">
+                  <span><i class="pulse-dot" aria-hidden="true"></i>${hotelPulse.get(hotel.id)?.visitors || 3} viewing</span>
+                  <span class="pulse-trend ${hotelPulse.get(hotel.id)?.trend > 0 ? 'up' : hotelPulse.get(hotel.id)?.trend < 0 ? 'down' : ''}">
+                    ${hotelPulse.get(hotel.id)?.trend > 0 ? '↑' : hotelPulse.get(hotel.id)?.trend < 0 ? '↓' : '•'} Price pulse
+                  </span>
+                </div>
+
                 <div class="hotel-bottom">
                   <div class="price">
-                    <strong>₹${hotel.price}</strong>
-                    <span>/ night (sample)</span>
-                    <div class="rooms">🛏 ${hotel.rooms} rooms left</div>
+                    <strong>₹${formatINR(liveHotelPrice(hotel))}</strong>
+                    <span>/ night</span>
+                    <div class="rooms">🛏 ${liveRoomsRemaining(hotel)} rooms left · demo estimate</div>
                   </div>
 
                   <div class="hotel-actions">
@@ -430,7 +568,7 @@ function renderHotels(list) {
           `
         )
         .join('')
-    : '<div class="card">No hotels found.</div>';
+    : `<div class="card">${showFavoritesOnly ? 'No saved stays yet. Tap ♡ Save on a hotel to keep it here.' : 'No hotels match those filters. Try another destination or amenity.'}</div>`;
 }
 
 function renderFeaturedHotels() {
@@ -536,7 +674,7 @@ function openHotelComparison() {
           <p class="location">📍 ${hotel.location}</p>
           <dl>
             <div><dt>Style</dt><dd>${hotel.type || 'Hotel'}</dd></div>
-            <div><dt>Sample rate / night</dt><dd>₹${hotel.price}</dd></div>
+            <div><dt>Sample rate / night</dt><dd>₹${formatINR(hotel.price)}</dd></div>
             <div><dt>Rooms listed</dt><dd>${hotel.rooms}</dd></div>
             <div><dt>Amenities</dt><dd>${hotel.amenities.join(', ')}</dd></div>
           </dl>
@@ -556,29 +694,61 @@ function searchHotels() {
   const query = document.getElementById('location').value.trim().toLowerCase();
   const selectedAmenity = amenity.value;
   const sortBy = sort.value;
+  const selectedVibe = document.getElementById('vibe').value;
+  const favorites = savedHotelIds();
 
   filteredHotels = filteredHotels.filter(
-    (hotel) =>
-      hotel.location.toLowerCase().includes(query) &&
-      (!selectedAmenity || hotel.amenities.includes(selectedAmenity))
+    (hotel) => {
+      const searchableText = `${hotel.name} ${hotel.location}`.toLowerCase();
+      const queryMatches = !query || query.split(/\s+/).every((term) => searchableText.includes(term));
+      return queryMatches &&
+      (!selectedAmenity || hotel.amenities.includes(selectedAmenity)) &&
+      (!selectedVibe || hotelVibes(hotel).includes(selectedVibe)) &&
+      (!showFavoritesOnly || favorites.includes(hotel.id));
+    }
   );
 
   if (sortBy === 'low') {
-    filteredHotels.sort((a, b) => a.price - b.price);
+    filteredHotels.sort((a, b) => liveHotelPrice(a) - liveHotelPrice(b));
   }
 
   if (sortBy === 'high') {
-    filteredHotels.sort((a, b) => b.price - a.price);
+    filteredHotels.sort((a, b) => liveHotelPrice(b) - liveHotelPrice(a));
   }
 
   renderHotels(filteredHotels);
+}
+
+function toggleHotelFavorite(id) {
+  const currentUser = me();
+  if (!currentUser) {
+    location.href = 'login.html';
+    return;
+  }
+
+  const favoriteIds = savedHotelIds();
+  const nextFavorites = favoriteIds.includes(id)
+    ? favoriteIds.filter((favoriteId) => favoriteId !== id)
+    : [...favoriteIds, id];
+  save(favoriteStorageKey(currentUser), nextFavorites);
+  searchHotels();
+}
+
+function toggleFavoritesFilter() {
+  showFavoritesOnly = !showFavoritesOnly;
+  searchHotels();
 }
 
 function clearSearch() {
   document.getElementById('location').value = '';
   amenity.value = '';
   sort.value = 'recommended';
-  renderHotels(hotels());
+  document.getElementById('vibe').value = '';
+  document.getElementById('searchCheckin').value = '';
+  document.getElementById('searchCheckout').value = '';
+  document.getElementById('searchGuests').value = '2';
+  showFavoritesOnly = false;
+  searchHotels();
 }
 
 function dateInputValue(date) {
@@ -604,50 +774,186 @@ if (landingSearchForm) {
     landingDestination.value = savedSearch.destination || '';
     landingCheckin.value = savedSearch.checkin || '';
     landingCheckout.value = savedSearch.checkout || '';
+    landingGuests.value = String(savedSearch.guests || 2);
     if (landingCheckin.value) updateCheckoutMinimum('landingCheckin', 'landingCheckout');
   }
+  if (!landingCheckin.value) landingCheckin.value = dateInputValue(today);
+  if (!landingCheckout.value || landingCheckout.value <= landingCheckin.value) {
+    const defaultCheckout = new Date(`${landingCheckin.value}T00:00:00`);
+    defaultCheckout.setDate(defaultCheckout.getDate() + 1);
+    landingCheckout.value = dateInputValue(defaultCheckout);
+  }
+  landingCheckin.addEventListener('change', () => updateCheckoutMinimum('landingCheckin', 'landingCheckout'));
+}
+
+function stayNights(checkin, checkout) {
+  if (!checkin || !checkout || checkout <= checkin) return 0;
+  return Math.round((new Date(`${checkout}T00:00:00`) - new Date(`${checkin}T00:00:00`)) / 86400000);
 }
 
 function openBooking(id) {
   const hotel = hotels().find((item) => item.id === id);
   if (!hotel) return;
   const search = getLandingSearch();
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const currentUser = me();
+  const today = dateInputValue(new Date());
+  const checkin = document.getElementById('searchCheckin')?.value || search?.checkin || today;
+  const defaultCheckoutDate = new Date(`${checkin}T00:00:00`);
+  defaultCheckoutDate.setDate(defaultCheckoutDate.getDate() + 1);
+  const checkout = document.getElementById('searchCheckout')?.value ||
+    (search?.checkout > checkin ? search.checkout : dateInputValue(defaultCheckoutDate));
+
+  activeBooking = {
+    hotelId: id,
+    rate: liveHotelPrice(hotel),
+    roomCategory: 'Deluxe',
+    guestCount: Number(document.getElementById('searchGuests')?.value || search?.guests || 2),
+    guestName: currentUser?.name || '',
+    guestEmail: currentUser?.email || '',
+    checkin,
+    checkout,
+    priceLock: false,
+    splitCount: 1,
+    holdExpiresAt: Date.now() + PRICE_HOLD_SECONDS * 1000
+  };
 
   modalContent.innerHTML = `
-    <p class="eyebrow blue">PAYMENT</p>
-    <h2>${hotel.name}</h2>
-    <p class="location">📍 ${hotel.location} • sample rate ₹${hotel.price}/night</p>
+    <div class="booking-visual">
+      <img src="${hotelPhotos(hotel)[0]}" alt="${hotel.name}" loading="lazy" decoding="async" />
+      <div>
+        <p class="eyebrow blue">PLAN YOUR STAY · DEMO RATE</p>
+        <h2>${hotel.name}</h2>
+        <p class="location">📍 ${hotel.location}</p>
+      </div>
+    </div>
 
-    <form class="booking-form" onsubmit="processPayment(event, ${id})">
-      <label>
-        Check-in date
-        <input id="bookDate" type="date" min="${dateInputValue(today)}" value="${search?.checkin || ''}" onchange="updateCheckoutMinimum()" required />
+    <form class="booking-form" data-hotel-id="${id}" onsubmit="confirmBooking(event, ${id})">
+      <div class="booking-dates">
+        <label>
+          <span>Check-in</span>
+          <input id="bookDate" type="date" min="${today}" value="${checkin}" onchange="updateCheckoutMinimum(); updateStayEstimate()" required />
+        </label>
+        <label>
+          <span>Check-out</span>
+          <input id="checkoutDate" type="date" min="${today}" value="${checkout}" onchange="updateStayEstimate()" required />
+        </label>
+      </div>
+
+      <div class="booking-dates">
+        <label>
+          <span>Guest name</span>
+          <input id="bookingGuestName" type="text" autocomplete="name" value="${escapeHTML(activeBooking.guestName)}" maxlength="80" required />
+        </label>
+        <label>
+          <span>Contact email</span>
+          <input id="bookingGuestEmail" type="email" autocomplete="email" value="${escapeHTML(activeBooking.guestEmail)}" maxlength="120" required />
+        </label>
+      </div>
+
+      <div class="booking-dates">
+        <label>
+          <span>Guests</span>
+          <select id="bookingGuestCount">${[1, 2, 3, 4, 5, 6].map((count) => `<option ${count === activeBooking.guestCount ? 'selected' : ''}>${count}</option>`).join('')}</select>
+        </label>
+        <label>
+          <span>Room category</span>
+          <select id="bookingRoomCategory">${Object.keys(ROOM_CATEGORIES).map((category) => `<option ${category === activeBooking.roomCategory ? 'selected' : ''}>${category}</option>`).join('')}</select>
+        </label>
+      </div>
+
+      <div class="stay-rate-row">
+        <span>Held demo rate · ${PRICE_HOLD_SECONDS / 60}:00</span>
+        <strong>₹${formatINR(activeBooking.rate)} <small>/ night</small></strong>
+      </div>
+      <div id="bookingHold" class="booking-hold" aria-live="polite"></div>
+      <label class="booking-option">
+        <input id="priceLock" type="checkbox" />
+        <span><b>24-hour price lock · ₹${formatINR(PRICE_LOCK_FEE)}</b><small>Demo add-on. Holds this rate for 24 hours.</small></span>
       </label>
-
-      <label>
-        Check-out date
-        <input id="checkoutDate" type="date" min="${dateInputValue(tomorrow)}" value="${search?.checkout || ''}" required />
+      <label class="booking-option">
+        <span><b>Split this booking</b><small>Equal demo shares for 2–6 people.</small></span>
+        <select id="splitCount">${[1, 2, 3, 4, 5, 6].map((count) => `<option ${count === 1 ? 'selected' : ''}>${count}</option>`).join('')}</select>
       </label>
-
-      <label>
-        UPI ID
-        <input id="upiId" type="text" placeholder="yournumber@upi" required />
-      </label>
-
-      <button class="confirm-btn" type="submit">Pay & Book</button>
+      <div id="stayEstimate" class="stay-estimate" aria-live="polite">
+        <div class="stay-estimate-copy">
+          <span>Estimated total · tax included</span>
+          <small class="stay-estimate-detail"></small>
+        </div>
+        <strong class="stay-estimate-total"></strong>
+      </div>
+      <p class="demo-payment-note">Demo booking only. No real payment is processed.</p>
+      <button class="confirm-btn" type="submit">Continue to demo payment <span aria-hidden="true">→</span></button>
     </form>
   `;
 
   modal.classList.remove('comparison-open');
-  if (search?.checkin) updateCheckoutMinimum();
+  modal.classList.add('booking-modal-open');
+  document.getElementById('priceLock').addEventListener('change', updateStayEstimate);
+  document.getElementById('splitCount').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingRoomCategory').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingGuestCount').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingGuestName').addEventListener('input', updateStayEstimate);
+  document.getElementById('bookingGuestEmail').addEventListener('input', updateStayEstimate);
+  activeBooking.detailsMarkup = modalContent.innerHTML;
+  updateCheckoutMinimum();
+  updateStayEstimate();
+  updateBookingHold();
+  clearInterval(bookingHoldTimer);
+  bookingHoldTimer = setInterval(updateBookingHold, 1000);
   modal.classList.remove('hidden');
 }
 
+function getBookingCalculation() {
+  const booking = activeBooking;
+  const nights = stayNights(booking.checkin, booking.checkout);
+  const nightlyRate = Math.round(booking.rate * ROOM_CATEGORIES[booking.roomCategory]);
+  const subtotal = nightlyRate * nights;
+  const tax = Math.round(subtotal * PRICE_TAX_RATE);
+  const lockFee = booking.priceLock ? PRICE_LOCK_FEE : 0;
+  return { nights, nightlyRate, subtotal, tax, lockFee, total: subtotal + tax + lockFee };
+}
+
+function syncBookingForm() {
+  if (!activeBooking) return;
+  activeBooking.checkin = document.getElementById('bookDate').value;
+  activeBooking.checkout = document.getElementById('checkoutDate').value;
+  activeBooking.guestName = document.getElementById('bookingGuestName').value.trim();
+  activeBooking.guestEmail = document.getElementById('bookingGuestEmail').value.trim().toLowerCase();
+  activeBooking.guestCount = Number(document.getElementById('bookingGuestCount').value);
+  activeBooking.roomCategory = document.getElementById('bookingRoomCategory').value;
+  activeBooking.priceLock = document.getElementById('priceLock').checked;
+  activeBooking.splitCount = Number(document.getElementById('splitCount').value);
+}
+
+function updateStayEstimate() {
+  const estimate = document.getElementById('stayEstimate');
+  if (!activeBooking || !estimate) return;
+  syncBookingForm();
+
+  const { nights, nightlyRate, subtotal, tax, lockFee, total } = getBookingCalculation();
+  estimate.querySelector('.stay-estimate-total').textContent = `₹${formatINR(total)}`;
+  estimate.querySelector('.stay-estimate-detail').textContent = nights
+    ? `${activeBooking.roomCategory} · ${activeBooking.guestCount} guest${activeBooking.guestCount === 1 ? '' : 's'} · ${nights} night${nights === 1 ? '' : 's'} at ₹${formatINR(nightlyRate)}/night · ₹${formatINR(subtotal)} + ₹${formatINR(tax)} tax${lockFee ? ` + ₹${formatINR(lockFee)} price lock` : ''}${activeBooking.splitCount > 1 ? ` · ₹${formatINR(splitShare(total, activeBooking.splitCount, 0))} per share` : ''}`
+    : 'Choose valid dates to see your total';
+}
+
+function updateBookingHold() {
+  if (!activeBooking) return;
+  const remaining = Math.max(0, Math.ceil((activeBooking.holdExpiresAt - Date.now()) / 1000));
+  const hold = document.getElementById('bookingHold');
+  if (hold) hold.textContent = `Rate held for ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+  if (remaining === 0) {
+    clearInterval(bookingHoldTimer);
+    bookingHoldTimer = null;
+    activeBooking = null;
+    closeModal();
+    showSuccessPopup('Your 10-minute demo price hold expired. Reopen this stay to see the latest rate.');
+  }
+}
+
 function updateCheckoutMinimum(checkinId = 'bookDate', checkoutId = 'checkoutDate') {
-  const bookingDate = document.getElementById(checkinId).value;
+  const checkinInput = document.getElementById(checkinId);
+  const bookingDate = checkinInput?.value;
   const checkoutInput = document.getElementById(checkoutId);
 
   if (!bookingDate || !checkoutInput) return;
@@ -662,8 +968,12 @@ function updateCheckoutMinimum(checkinId = 'bookDate', checkoutId = 'checkoutDat
 }
 
 function closeModal() {
+  clearInterval(bookingHoldTimer);
+  bookingHoldTimer = null;
+  activeBooking = null;
   modal.classList.add('hidden');
   modal.classList.remove('comparison-open');
+  modal.classList.remove('booking-modal-open');
 }
 
 function showSuccessPopup(message) {
@@ -683,61 +993,343 @@ function showSuccessPopup(message) {
   setTimeout(() => popup.classList.remove('show'), 2200);
 }
 
-function processPayment(event, hotelId) {
+function confirmBooking(event, hotelId) {
   event.preventDefault();
+  if (!activeBooking || activeBooking.hotelId !== hotelId) return;
+  syncBookingForm();
+  const { nights } = getBookingCalculation();
 
-  const hotelList = hotels();
-  const hotel = hotelList.find((item) => item.id === hotelId);
-  const upiId = document.getElementById('upiId').value.trim();
-  const bookingDate = document.getElementById('bookDate').value;
-  const checkoutDate = document.getElementById('checkoutDate').value;
-
-  if (!bookingDate || bookingDate < dateInputValue(new Date())) {
+  if (activeBooking.holdExpiresAt <= Date.now()) {
+    return updateBookingHold();
+  }
+  if (!activeBooking.checkin || activeBooking.checkin < dateInputValue(new Date())) {
     return showSuccessPopup('Choose a check-in date from today onward.');
   }
 
-  if (!checkoutDate || checkoutDate <= bookingDate) {
+  if (!nights) {
     return showSuccessPopup('Check-out must be after check-in.');
   }
 
+  if (!activeBooking.guestName || !/^\S+@\S+\.\S+$/.test(activeBooking.guestEmail)) {
+    return showSuccessPopup('Enter the guest name and a valid contact email.');
+  }
+
+  const hotel = hotels().find((item) => item.id === hotelId);
   if (!hotel || hotel.rooms < 1) {
     return showSuccessPopup('No rooms available right now.');
   }
 
-  if (!upiId) {
-    return showSuccessPopup('Please enter a valid UPI ID.');
-  }
+  activeBooking.detailsMarkup = modalContent.innerHTML;
+  renderDemoPayment();
+}
 
-  hotel.rooms -= 1;
-  save('stayeasy_hotels', hotelList);
+function renderBookingDetails() {
+  if (!activeBooking || activeBooking.holdExpiresAt <= Date.now()) return updateBookingHold();
+  modalContent.innerHTML = activeBooking.detailsMarkup;
+  document.getElementById('bookDate').value = activeBooking.checkin;
+  document.getElementById('checkoutDate').value = activeBooking.checkout;
+  document.getElementById('bookingGuestName').value = activeBooking.guestName;
+  document.getElementById('bookingGuestEmail').value = activeBooking.guestEmail;
+  document.getElementById('bookingGuestCount').value = String(activeBooking.guestCount);
+  document.getElementById('bookingRoomCategory').value = activeBooking.roomCategory;
+  document.getElementById('priceLock').checked = activeBooking.priceLock;
+  document.getElementById('splitCount').value = String(activeBooking.splitCount);
+  document.getElementById('priceLock').addEventListener('change', updateStayEstimate);
+  document.getElementById('splitCount').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingRoomCategory').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingGuestCount').addEventListener('change', updateStayEstimate);
+  document.getElementById('bookingGuestName').addEventListener('input', updateStayEstimate);
+  document.getElementById('bookingGuestEmail').addEventListener('input', updateStayEstimate);
+  updateStayEstimate();
+  updateBookingHold();
+}
+
+function splitShare(total, count, shareIndex) {
+  const base = Math.floor(total / count);
+  return base + (shareIndex < total % count ? 1 : 0);
+}
+
+function renderDemoPayment() {
+  const calculation = getBookingCalculation();
+  const share = splitShare(calculation.total, activeBooking.splitCount, 0);
+  modalContent.innerHTML = `
+    <p class="eyebrow blue">DEMO PAYMENT</p>
+    <h2>Choose how to simulate payment</h2>
+    <p class="payment-summary">${activeBooking.splitCount > 1 ? `Your first share: ₹${formatINR(share)} of ₹${formatINR(calculation.total)}` : `Total: ₹${formatINR(calculation.total)}`}</p>
+    <div class="booking-hold" id="bookingHold" aria-live="polite"></div>
+    <label class="filter-field payment-method-field">
+      <span>Payment method</span>
+      <select id="paymentMethod">
+        <option value="Card">Card</option>
+        <option value="UPI">UPI</option>
+        <option value="Net Banking">Net Banking</option>
+      </select>
+    </label>
+    <div id="paymentFields"></div>
+    <p class="demo-payment-note">Simulation only—no money is charged, and payment details are not stored or sent.</p>
+    <button class="confirm-btn" type="button" onclick="completeDemoPayment()">Simulate payment <span aria-hidden="true">→</span></button>
+    <button class="secondary-btn payment-back" type="button" onclick="renderBookingDetails()">Back to booking</button>
+  `;
+  modal.classList.add('booking-modal-open');
+  document.getElementById('paymentMethod').addEventListener('change', renderPaymentFields);
+  renderPaymentFields();
+  updateBookingHold();
+}
+
+function renderPaymentFields() {
+  const method = document.getElementById('paymentMethod').value;
+  const fields = document.getElementById('paymentFields');
+  if (method === 'Card') {
+    fields.innerHTML = `
+      <div class="booking-dates payment-fields">
+        <label><span>Test card number</span><input id="cardNumber" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" maxlength="19" /></label>
+        <label><span>Expiry (MM/YY)</span><input id="cardExpiry" inputmode="numeric" autocomplete="off" placeholder="12/29" maxlength="5" /></label>
+        <label><span>CVV</span><input id="cardCvv" type="password" inputmode="numeric" autocomplete="off" placeholder="123" maxlength="4" /></label>
+        <label class="card-name-field"><span>Name on card</span><input id="cardName" autocomplete="off" maxlength="80" /></label>
+      </div>
+    `;
+    document.getElementById('cardNumber').addEventListener('input', (event) => {
+      event.target.value = event.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+    });
+    document.getElementById('cardExpiry').addEventListener('input', (event) => {
+      const digits = event.target.value.replace(/\D/g, '').slice(0, 4);
+      event.target.value = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+    });
+  } else if (method === 'UPI') {
+    fields.innerHTML = '<label class="filter-field payment-method-field"><span>Demo UPI ID</span><input id="upiId" autocomplete="off" placeholder="name@okbank" /></label>';
+  } else {
+    fields.innerHTML = `
+      <label class="filter-field payment-method-field">
+        <span>Bank</span>
+        <select id="netBank">
+          <option>State Bank of India</option><option>HDFC Bank</option><option>ICICI Bank</option><option>Axis Bank</option>
+        </select>
+      </label>
+    `;
+  }
+}
+
+function isValidDemoCard(number) {
+  let sum = 0;
+  let doubleDigit = false;
+  for (let index = number.length - 1; index >= 0; index -= 1) {
+    let digit = Number(number[index]);
+    if (doubleDigit) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    doubleDigit = !doubleDigit;
+  }
+  return number.length >= 13 && sum % 10 === 0;
+}
+
+function validateDemoPayment() {
+  const method = document.getElementById('paymentMethod').value;
+  if (method === 'Card') {
+    const number = document.getElementById('cardNumber').value.replace(/\D/g, '');
+    const expiryValue = document.getElementById('cardExpiry').value;
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryValue)) return 'Enter a valid future expiry date in MM/YY format.';
+    const expiry = expiryValue.split('/');
+    const month = Number(expiry[0]);
+    const year = 2000 + Number(expiry[1]);
+    const cvv = document.getElementById('cardCvv').value;
+    if (!isValidDemoCard(number)) return 'Enter a valid test card number (4242 4242 4242 4242 is accepted).';
+    const now = new Date();
+    if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
+      return 'Enter a valid future expiry date in MM/YY format.';
+    }
+    if (!/^\d{3,4}$/.test(cvv)) return 'Enter a 3- or 4-digit test CVV.';
+    if (!document.getElementById('cardName').value.trim()) return 'Enter the name on the test card.';
+  }
+  if (method === 'UPI' && !/^[\w.-]{2,}@[a-z\d.-]{2,}$/i.test(document.getElementById('upiId').value.trim())) {
+    return 'Enter a demo UPI ID such as name@okbank.';
+  }
+  return '';
+}
+
+function completeDemoPayment() {
+  if (!activeBooking || activeBooking.holdExpiresAt <= Date.now()) {
+    return updateBookingHold();
+  }
+  const validationMessage = validateDemoPayment();
+  if (validationMessage) return showSuccessPopup(validationMessage);
 
   const currentUser = me();
+  const allHotels = hotels();
+  const hotel = allHotels.find((item) => item.id === activeBooking.hotelId);
+  if (!hotel || hotel.rooms < 1) return showSuccessPopup('No rooms available right now.');
+
+  const calculation = getBookingCalculation();
   const allBookings = bookings();
-  const newBooking = {
-    id: Date.now(),
+  const paidAmount = splitShare(calculation.total, activeBooking.splitCount, 0);
+  const bookingId = `SE${Date.now().toString(36).toUpperCase()}`;
+  const bookingRecord = {
+    id: bookingId,
+    hotelId: hotel.id,
     hotelName: hotel.name,
     location: hotel.location,
-    guest: currentUser.name,
+    guest: activeBooking.guestName,
+    guestEmail: activeBooking.guestEmail,
     email: currentUser.email,
-    date: bookingDate,
-    checkoutDate,
-    price: hotel.price,
-    upiId,
-    paymentStatus: 'Paid',
-    status: 'Confirmed',
+    guestCount: activeBooking.guestCount,
+    roomCategory: activeBooking.roomCategory,
+    date: activeBooking.checkin,
+    checkoutDate: activeBooking.checkout,
+    price: activeBooking.rate,
+    nights: calculation.nights,
+    subtotal: calculation.subtotal,
+    taxAmount: calculation.tax,
+    lockFee: calculation.lockFee,
+    totalAmount: calculation.total,
+    priceLockExpiresAt: activeBooking.priceLock ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+    splitCount: activeBooking.splitCount,
+    paidShares: 1,
+    paidAmount,
+    paymentMethod: document.getElementById('paymentMethod').value,
+    paymentStatus: activeBooking.splitCount > 1 ? `1 of ${activeBooking.splitCount} demo shares recorded` : 'Demo payment simulated',
+    status: activeBooking.splitCount > 1 ? 'Partially paid' : 'Confirmed',
+    roomsReserved: 1,
     bookedAt: new Date().toISOString()
   };
 
-  allBookings.push(newBooking);
+  const originalHotels = hotels();
+  hotel.rooms -= 1;
+  if (!save('stayeasy_hotels', allHotels)) {
+    return showSuccessPopup('Could not save room availability. Please try again.');
+  }
+  if (!save('stayeasy_bookings', [...allBookings, bookingRecord])) {
+    save('stayeasy_hotels', originalHotels);
+    return showSuccessPopup('Could not save the booking. No demo payment was recorded.');
+  }
+  save('stayeasy_lastBooking', bookingRecord);
 
-  save('stayeasy_bookings', allBookings);
-  localStorage.setItem('stayeasy_lastBooking', JSON.stringify(newBooking));
-  sessionStorage.removeItem('stayeasy_search');
+  try {
+    sessionStorage.removeItem('stayeasy_search');
+  } catch (error) {
+    // The booking is saved even if the temporary search cannot be cleared.
+  }
 
-  closeModal();
-  renderHotels(hotelList);
+  renderBookingConfirmation(bookingRecord);
+  searchHotels();
   renderMyBookings();
-  showSuccessPopup('Payment successful! Hotel booked successfully.');
+}
+
+function renderBookingConfirmation(booking) {
+  clearInterval(bookingHoldTimer);
+  bookingHoldTimer = null;
+  activeBooking = null;
+  const paymentText = booking.splitCount > 1
+    ? `${booking.paidShares} of ${booking.splitCount} demo shares recorded. Remaining friends' shares can be marked in My Trips.`
+    : 'Demo payment simulated. No real payment was processed.';
+  modalContent.innerHTML = `
+    <div class="booking-confirmation">
+      <div class="confirmation-mark" aria-hidden="true">✓</div>
+      <p class="eyebrow blue">STAYEASY DEMO TICKET</p>
+      <h2>${booking.status === 'Confirmed' ? 'Booking confirmed' : 'Booking reserved'}</h2>
+      <p class="demo-payment-note">${paymentText}</p>
+      <div class="ticket-card">
+        <b>${escapeHTML(booking.hotelName)}</b>
+        <span>${escapeHTML(booking.location)} · ${escapeHTML(booking.roomCategory)}</span>
+        <span>${booking.date} to ${booking.checkoutDate} · ${booking.guestCount} guest${booking.guestCount === 1 ? '' : 's'}</span>
+        <span>Booking ID: <b>${booking.id}</b></span>
+        <strong>₹${formatINR(booking.totalAmount)} total · ₹${formatINR(booking.paidAmount)} demo share recorded</strong>
+        ${booking.priceLockExpiresAt ? `<span>₹${formatINR(PRICE_LOCK_FEE)} demo price lock active until ${new Date(booking.priceLockExpiresAt).toLocaleString('en-IN')}</span>` : ''}
+      </div>
+      <button class="confirm-btn" type="button" onclick="downloadBookingTicket('${booking.id}')">Download ticket</button>
+      <button class="secondary-btn payment-back" type="button" onclick="closeModal()">Done</button>
+    </div>
+  `;
+}
+
+function downloadBookingTicket(bookingId) {
+  const booking = bookings().find((item) => item.id === bookingId);
+  if (!booking) return showSuccessPopup('Ticket could not be found.');
+  const ticket = [
+    'STAYEASY — DEMO BOOKING TICKET',
+    `Booking ID: ${booking.id}`,
+    `Hotel: ${booking.hotelName}`,
+    `Location: ${booking.location}`,
+    `Guest: ${booking.guest} (${booking.guestEmail || booking.email})`,
+    `Stay: ${booking.date} to ${booking.checkoutDate}`,
+    `Room: ${booking.roomCategory || 'Deluxe'} · ${booking.guestCount || 1} guest(s)`,
+    `Total: ₹${formatINR(booking.totalAmount || booking.price)}`,
+    `Demo payment: ${booking.paymentStatus || 'Not processed'}`,
+    'No real payment was processed.'
+  ].join('\r\n');
+  const file = new Blob([ticket], { type: 'text/plain;charset=utf-8' });
+  const fileUrl = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = fileUrl;
+  link.download = `StayEasy-ticket-${booking.id}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+}
+
+function tripCategory(booking) {
+  if (booking.status === 'Cancelled') return 'cancelled';
+  return booking.checkoutDate && booking.checkoutDate < dateInputValue(new Date()) ? 'completed' : 'upcoming';
+}
+
+function setTripFilter(filter) {
+  selectedTripFilter = filter;
+  renderMyBookings();
+}
+
+function cancelBooking(bookingId) {
+  const allBookings = bookings();
+  const booking = allBookings.find((item) => item.id === bookingId && item.email === me()?.email);
+  if (!booking || tripCategory(booking) !== 'upcoming') return;
+  if (!window.confirm('Cancel this demo booking? No refund or real payment is involved.')) return;
+
+  const originalHotels = hotels();
+  const updatedHotels = hotels();
+  const hotel = updatedHotels.find((item) => item.id === booking.hotelId);
+  const inventoryChanged = Boolean(hotel && !booking.inventoryRestored);
+  if (hotel && !booking.inventoryRestored) {
+    hotel.rooms += booking.roomsReserved || 1;
+    if (!save('stayeasy_hotels', updatedHotels)) {
+      return showSuccessPopup('Could not restore room availability. Booking was not cancelled.');
+    }
+    booking.inventoryRestored = true;
+  }
+  booking.status = 'Cancelled';
+  booking.cancelledAt = new Date().toISOString();
+  booking.refundStatus = 'Demo only — no refund processed';
+  if (!save('stayeasy_bookings', allBookings)) {
+    if (inventoryChanged) save('stayeasy_hotels', originalHotels);
+    return showSuccessPopup('Could not save cancellation. Please try again.');
+  }
+  showSuccessPopup('Demo booking cancelled. No refund was processed.');
+  searchHotels();
+  renderMyBookings();
+}
+
+function simulateFriendShare(bookingId) {
+  const allBookings = bookings();
+  const booking = allBookings.find((item) => item.id === bookingId && item.email === me()?.email);
+  if (!booking || booking.status === 'Cancelled' || booking.paidShares >= booking.splitCount) return;
+  booking.paidShares += 1;
+  booking.paidAmount += splitShare(booking.totalAmount, booking.splitCount, booking.paidShares - 1);
+  booking.paymentStatus = `${booking.paidShares} of ${booking.splitCount} demo shares recorded`;
+  if (booking.paidShares === booking.splitCount) booking.status = 'Confirmed';
+  if (!save('stayeasy_bookings', allBookings)) {
+    return showSuccessPopup('Could not save the demo share. Please try again.');
+  }
+  showSuccessPopup(booking.paidShares === booking.splitCount ? 'All demo shares are recorded.' : 'Friend demo share recorded.');
+  renderMyBookings();
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
 }
 
 function renderMyBookings() {
@@ -750,21 +1342,41 @@ function renderMyBookings() {
   }
 
   if (bookingsContainer) {
-    bookingsContainer.innerHTML = userBookings.length
-      ? userBookings
-          .map(
-            (booking) => `
-              <div class="booking-item">
-                <div>
-                  <b>${booking.hotelName}</b>
-                  <small>📍 ${booking.location} • Check-in: ${booking.date}${booking.checkoutDate ? ` • Check-out: ${booking.checkoutDate}` : ''}</small>
-                </div>
-                <span class="status">${booking.status}<br>₹${booking.price}</span>
-              </div>
-            `
-          )
-          .join('')
-      : '<div class="booking-item"><small>No bookings yet.</small></div>';
+    const visibleBookings = userBookings.filter((booking) => tripCategory(booking) === selectedTripFilter);
+    document.querySelectorAll('[data-trip-filter]').forEach((button) => {
+      const selected = button.dataset.tripFilter === selectedTripFilter;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    bookingsContainer.innerHTML = visibleBookings.length
+      ? visibleBookings.map((booking) => {
+        const category = tripCategory(booking);
+        const parts = [
+          `📍 ${escapeHTML(booking.location)}`,
+          `Check-in: ${escapeHTML(booking.date)}`,
+          booking.checkoutDate ? `Check-out: ${escapeHTML(booking.checkoutDate)}` : '',
+          `${booking.nights || stayNights(booking.date, booking.checkoutDate) || 1} night(s)`,
+          `${escapeHTML(booking.roomCategory || 'Deluxe')} · ${booking.guestCount || 1} guest(s)`,
+          booking.guest ? `Guest: ${escapeHTML(booking.guest)}` : ''
+        ].filter(Boolean).join(' • ');
+        return `
+          <article class="booking-item booking-item-featured">
+            <div class="booking-item-info">
+              <b>${escapeHTML(booking.hotelName)}</b>
+              <small>${parts}</small>
+              <small>Booking ${escapeHTML(booking.id)} · ${escapeHTML(booking.paymentStatus || 'Demo payment not processed')}</small>
+            </div>
+            <div class="booking-item-actions">
+              <span class="status ${category === 'cancelled' ? 'status-cancelled' : category === 'completed' ? 'status-completed' : ''}">${category[0].toUpperCase() + category.slice(1)} · ₹${formatINR(booking.totalAmount || booking.price)} total</span>
+              <button class="secondary-btn" type="button" onclick="downloadBookingTicket('${booking.id}')">Ticket</button>
+              ${category === 'upcoming' && booking.status !== 'Confirmed' ? `<button class="secondary-btn" type="button" onclick="simulateFriendShare('${booking.id}')">Record friend share (${booking.paidShares}/${booking.splitCount})</button>` : ''}
+              ${category === 'upcoming' ? `<button class="delete" type="button" onclick="cancelBooking('${booking.id}')">Cancel</button>` : ''}
+              ${booking.refundStatus ? `<small>${escapeHTML(booking.refundStatus)}</small>` : ''}
+            </div>
+          </article>
+        `;
+      }).join('')
+      : `<div class="booking-item"><small>No ${selectedTripFilter} trips yet.</small></div>`;
   }
 }
 
@@ -777,18 +1389,26 @@ if (document.getElementById('hotels')) {
     if (search?.destination) {
       document.getElementById('location').value = search.destination;
     }
-
-    const visibleHotels = search?.destination
-      ? hotels().filter((hotel) => hotel.location === search.destination)
-      : hotels();
-
-    renderHotels(visibleHotels);
+    document.getElementById('searchCheckin').value = search?.checkin || '';
+    document.getElementById('searchCheckout').value = search?.checkout || '';
+    document.getElementById('searchGuests').value = String(search?.guests || 2);
+    document.getElementById('searchCheckin').min = dateInputValue(new Date());
+    document.getElementById('searchCheckout').min = dateInputValue(new Date(Date.now() + 86400000));
+    document.getElementById('searchCheckin').addEventListener('change', () => {
+      updateCheckoutMinimum('searchCheckin', 'searchCheckout');
+    });
+    document.getElementById('searchCheckout').addEventListener('change', () => {
+      const checkin = document.getElementById('searchCheckin').value;
+      if (checkin) updateCheckoutMinimum('searchCheckin', 'searchCheckout');
+    });
+    searchHotels();
     renderMyBookings();
     renderCompareTray();
 
     if (search?.hotelId) {
       openBooking(Number(search.hotelId));
     }
+    window.setInterval(updateHotelPricePulse, 5000);
   }
 }
 
@@ -840,7 +1460,7 @@ function renderAdmin() {
         <div class="admin-hotel">
           <div>
             <b>${hotel.name}</b>
-            <small>${hotel.location} • ₹${hotel.price} • ${hotel.rooms} rooms</small>
+            <small>${hotel.location} • ₹${formatINR(hotel.price)} • ${hotel.rooms} rooms</small>
           </div>
           <button class="delete" onclick="deleteHotel(${hotel.id})">Delete</button>
         </div>
@@ -850,28 +1470,30 @@ function renderAdmin() {
 
   adminBookings.innerHTML = bookingList.length
     ? `
-      <table class="table">
-        <tr>
-          <th>Guest</th>
-          <th>Hotel</th>
-          <th>Stay dates</th>
-          <th>Amount</th>
-          <th>Status</th>
-        </tr>
-        ${bookingList
-          .map(
-            (booking) => `
-              <tr>
-                <td>${booking.guest}</td>
-                <td>${booking.hotelName}</td>
-                <td>${booking.date}${booking.checkoutDate ? ` – ${booking.checkoutDate}` : ''}</td>
-                <td>₹${booking.price}</td>
-                <td>${booking.status}</td>
-              </tr>
-            `
-          )
-          .join('')}
-      </table>
+      <div class="table-scroll">
+        <table class="table">
+          <tr>
+            <th>Guest</th>
+            <th>Hotel</th>
+            <th>Stay dates</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+          ${bookingList
+            .map(
+              (booking) => `
+                <tr>
+                  <td>${booking.guest}</td>
+                  <td>${booking.hotelName}</td>
+                  <td>${booking.date}${booking.checkoutDate ? ` – ${booking.checkoutDate}` : ''}</td>
+                  <td>₹${formatINR(booking.totalAmount || booking.price)}</td>
+                  <td>${booking.status}</td>
+                </tr>
+              `
+            )
+            .join('')}
+        </table>
+      </div>
     `
     : '<p class="muted">No bookings yet.</p>';
 }

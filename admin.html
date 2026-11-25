@@ -4,16 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Module | StayEasy</title>
-    <link rel="stylesheet" href="style.css?v=20261106-verified-galleries" />
+    <link rel="stylesheet" href="style.css?v=20261125-luxe-v6" />
   </head>
 
-  <body>
+  <body class="dashboard-page admin-dashboard">
     <nav class="dashboard-nav">
-      <a class="brand" href="admin.html">Stay<span>Easy</span></a>
-
-      <div>
-        <span class="admin-badge">ADMIN MODULE</span>
-        <button class="logout" onclick="logout()">Logout</button>
+      <div class="dashboard-nav-inner">
+        <a class="brand" href="admin.html">Stay<span>Easy</span></a>
+        <div class="dashboard-nav-actions">
+          <span class="admin-badge">ADMIN MODULE</span>
+          <button class="logout" type="button" onclick="logout()">Log out <span aria-hidden="true">↗</span></button>
+        </div>
       </div>
     </nav>
 
@@ -99,6 +100,6 @@
       </div>
     </main>
 
-    <script src="script.js?v=20261106-verified-galleries"></script>
+    <script src="script.js?v=20261125-luxe-v7"></script>
   </body>
 </html>
